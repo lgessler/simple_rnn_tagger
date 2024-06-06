@@ -5,15 +5,20 @@ from torchmetrics import Accuracy
 from allennlp_light.nn.util import sequence_cross_entropy_with_logits
 
 
-class RnnTagger(nn.Module):
+class LstmTagger(nn.Module):
 
     def __init__(self, embedding_dim, hidden_dim, token_vocab, tag_vocab):
         super().__init__()
         self.hidden_dim = hidden_dim
         self.word_embeddings = nn.Embedding(len(token_vocab), embedding_dim, padding_idx=token_vocab.index("@@PAD@@"))
-        self.rnn_cell = nn.RNNCell(embedding_dim, hidden_dim)
-        # self.rnn_cell = nn.GRUCell(embedding_dim, hidden_dim)
-        self.tag_head = nn.Linear(hidden_dim, len(tag_vocab))
+        self.lstm = nn.LSTM(
+            embedding_dim,
+            hidden_dim,
+            num_layers=2,
+            bidirectional=True,
+            batch_first=True
+        )
+        self.tag_head = nn.Linear(hidden_dim * 2, len(tag_vocab))
         self.token_vocab = token_vocab
         self.tag_vocab = tag_vocab
         self.accuracy = Accuracy(num_classes=len(self.tag_vocab), task="multiclass", top_k=1)
@@ -23,13 +28,11 @@ class RnnTagger(nn.Module):
         device = tokens.device
         embeds = self.word_embeddings(tokens)
 
-        h_n = None
-        states = []
-        for i in range(seq_length):
-            h_n = self.rnn_cell(embeds[:, i], h_n)
-            states.append(h_n)
-
-        stacked_states = torch.stack(states, dim=1).to(device)
+        h_0 = (
+            torch.zeros((2 * 2, batch_size, self.hidden_dim)).to(device),
+            torch.zeros((2 * 2, batch_size, self.hidden_dim)).to(device)
+        )
+        stacked_states, _ = self.lstm(embeds, h_0)
         tag_logits = self.tag_head(stacked_states)
 
         mask = tokens.eq(0.0).logical_not()
@@ -38,7 +41,7 @@ class RnnTagger(nn.Module):
 
         output = {"logits": tag_logits, "preds": pred_tags * mask}
         if tags is not None:
-            loss = sequence_cross_entropy_with_logits(stacked_states, tags, mask, average="token")
+            loss = sequence_cross_entropy_with_logits(tag_logits, tags, mask, average="token")
             output["loss"] = loss
             flat_preds = pred_tags.masked_select(mask)
             flat_tags = tags.masked_select(mask)
