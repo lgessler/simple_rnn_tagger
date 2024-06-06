@@ -1,3 +1,4 @@
+import os
 import shutil
 import time
 
@@ -100,6 +101,7 @@ def train_model(model, data_loaders, optimizer, device, num_epochs=25):
 
 
 def save_checkpoint(save_dir, state, is_best):
+    os.makedirs(save_dir, exist_ok=True)
     savepath = save_dir + '/' + 'checkpoint.pth.tar'
     torch.save(state, savepath)
     if is_best:
