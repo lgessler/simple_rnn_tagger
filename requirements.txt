@@ -1,2 +1,4 @@
 conllu
 torch
+allennlp_light
+torchmetrics

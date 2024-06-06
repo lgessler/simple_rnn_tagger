@@ -11,7 +11,8 @@ class RnnTagger(nn.Module):
         super().__init__()
         self.hidden_dim = hidden_dim
         self.word_embeddings = nn.Embedding(len(token_vocab), embedding_dim, padding_idx=token_vocab.index("@@PAD@@"))
-        self.rnn_cell = nn.GRUCell(embedding_dim, hidden_dim)
+        self.rnn_cell = nn.RNNCell(embedding_dim, hidden_dim)
+        # self.rnn_cell = nn.GRUCell(embedding_dim, hidden_dim)
         self.tag_head = nn.Linear(hidden_dim, len(tag_vocab))
         self.token_vocab = token_vocab
         self.tag_vocab = tag_vocab
